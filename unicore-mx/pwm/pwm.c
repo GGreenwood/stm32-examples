@@ -20,14 +20,48 @@
  */
 
 #include <unicore-mx/stm32/rcc.h>
+#include <unicore-mx/stm32/flash.h>
 #include <unicore-mx/stm32/gpio.h>
 #include <unicore-mx/stm32/timer.h>
 
 /* Set STM32 to 48 MHz, based on the 12MHz crystal */
 static void clock_setup(void)
 {
-    rcc_osc_off(RCC_PLL);
-    rcc_set_pll_multiplication_factor(4);
+    // If we're the PLL is selected as the system clock,
+    // we need to switch to HSI before configuring
+    if(rcc_system_clock_source() == RCC_PLL) {
+        //TODO
+    }
+    
+    // Turn off PLL
+    //rcc_osc_off(RCC_PLL);     << this isn't implemented yet
+    RCC_CR &= ~RCC_CR_PLLON;
+
+    // Wait for PLL to turn off
+    while ((RCC_CR & RCC_CR_PLLRDY) != 0);
+    
+    // Configure the predivider and multiplier
+    // (12MHz / 2) * 8 = 48MHz
+    rcc_set_prediv(RCC_CFGR2_PREDIV_DIV2);
+    rcc_set_pll_multiplication_factor(RCC_CFGR_PLLMUL_MUL8);
+
+    // Set the PLL source to the HSE
+    RCC_CFGR |= RCC_CFGR_PLLSRC;
+
+    // Set the AHB and APB prescalers to 1
+    rcc_set_ppre(RCC_CFGR_PPRE_NODIV);
+    rcc_set_hpre(RCC_CFGR_HPRE_NODIV);
+    rcc_apb1_frequency = 48000000;
+    rcc_ahb_frequency = 48000000;
+
+    // Update the flash memory speed before increasing the clock speed
+    flash_set_ws(FLASH_ACR_LATENCY_024_048MHZ);
+
+    // Turn on the source oscillator
+    rcc_osc_on(RCC_HSE);
+    rcc_wait_for_osc_ready(RCC_HSE);
+
+    // Turn on PLL
     rcc_osc_on(RCC_PLL);
     rcc_wait_for_osc_ready(RCC_PLL);
     rcc_set_sysclk_source(RCC_PLL);
@@ -63,9 +97,10 @@ int main(void)
     timer_enable_break_main_output(TIM3);
 
     // Configure channel 1(PA6)
-    timer_set_oc_value(TIM3, TIM_OC1, (192 / 4) - 1);
+    // Will be low for 1us, high for the remaining 3us
+    timer_set_oc_value(TIM3, TIM_OC1, 48 - 1);
 
-    // Set TIM3's period
+    // Set TIM3's period to 4us at 48MHz
     timer_set_period(TIM3, 192 - 1);
 
     // Enable the timer
