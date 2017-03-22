@@ -18,10 +18,14 @@
 #include <unicore-mx/stm32/rcc.h>
 #include <unicore-mx/stm32/gpio.h>
 
-/* Set STM32 to 48 MHz. */
+/* Set STM32 to 48 MHz, based on the 12MHz crystal */
 static void clock_setup(void)
 {
-    rcc_clock_setup_in_hsi_out_48mhz();
+    rcc_osc_off(RCC_PLL);
+    rcc_set_pll_multiplication_factor(4);
+    rcc_osc_on(RCC_PLL);
+    rcc_wait_for_osc_ready(RCC_PLL);
+    rcc_set_sysclk_source(RCC_HSI);
 }
 
 static void gpio_setup(void)

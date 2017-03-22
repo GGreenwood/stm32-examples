@@ -42,6 +42,7 @@ void cdcacm_target_init(void)
 	rcc_set_sysclk_source(RCC_HSI48);
 
 	rcc_periph_clock_enable(RCC_SYSCFG_COMP);
+
 	SYSCFG_CFGR1 |= 1 << 4 /* PA11_PA12_RMP */;
 }
 
