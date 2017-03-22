@@ -30,7 +30,7 @@ static void clock_setup(void)
     rcc_set_pll_multiplication_factor(4);
     rcc_osc_on(RCC_PLL);
     rcc_wait_for_osc_ready(RCC_PLL);
-    rcc_set_sysclk_source(RCC_HSI);
+    rcc_set_sysclk_source(RCC_PLL);
 }
 
 int main(void)
