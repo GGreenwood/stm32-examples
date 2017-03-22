@@ -20,10 +20,10 @@
 ##
 
 # Be silent per default, but 'make V=1' will show all compiler calls.
-ifneq ($(V),1)
-Q		:= @
-NULL		:= 2>/dev/null
-endif
+#ifneq ($(V),1)
+#Q		:= @
+#NULL		:= 2>/dev/null
+#endif
 
 ###############################################################################
 # Executables

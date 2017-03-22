@@ -41,4 +41,5 @@ BMP_PORT	?=
 #STLINK_PORT	?= :4242
 
 
+COMMON_DIR = ../unicore-mx-examples/examples/common
 include ../unicore-mx.rules.mk
