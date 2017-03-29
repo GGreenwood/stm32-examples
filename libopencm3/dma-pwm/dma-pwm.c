@@ -26,7 +26,9 @@
 #include <libopencm3/stm32/dma.h>
 #include <libopencm3/cm3/nvic.h>
 
-uint16_t waveform[192] __attribute__((aligned(16)));
+#define DMA_SIZE    64
+
+uint16_t waveform[DMA_SIZE] __attribute__((aligned(16)));
 
 /* Set STM32 to 48 MHz, based on the 12MHz crystal */
 static void clock_setup_pll_48mhz(void) {
@@ -107,43 +109,48 @@ static void pwm_setup(void) {
     timer_enable_counter(TIM3);
 }
 
+// TIM3, Channel 1 DMA events are sent to DMA Channel 4
 static void dma_setup(void) {
     rcc_periph_clock_enable(RCC_DMA);
 
-    dma_channel_reset(DMA1, DMA_CHANNEL1);
-    dma_set_priority(DMA1, DMA_CHANNEL1, DMA_CCR_PL_HIGH);
+    dma_channel_reset(DMA1, DMA_CHANNEL4);
+    dma_set_priority(DMA1, DMA_CHANNEL4, DMA_CCR_PL_HIGH);
 
-    dma_set_memory_size(DMA1, DMA_CHANNEL1, DMA_CCR_MSIZE_16BIT);
-    dma_set_peripheral_size(DMA1, DMA_CHANNEL1, DMA_CCR_MSIZE_16BIT);
-    dma_enable_memory_increment_mode(DMA1, DMA_CHANNEL1);
-    dma_enable_circular_mode(DMA1, DMA_CHANNEL1);
+    dma_set_memory_size(DMA1, DMA_CHANNEL4, DMA_CCR_MSIZE_16BIT);
+    dma_set_peripheral_size(DMA1, DMA_CHANNEL4, DMA_CCR_MSIZE_16BIT);
+    dma_enable_memory_increment_mode(DMA1, DMA_CHANNEL4);
+    dma_enable_circular_mode(DMA1, DMA_CHANNEL4);
 
-    dma_set_read_from_memory(DMA1, DMA_CHANNEL1);
+    dma_set_read_from_memory(DMA1, DMA_CHANNEL4);
 
-    dma_set_peripheral_address(DMA1, DMA_CHANNEL1, (uint32_t) &TIM3_CCR1);
-    dma_set_memory_address(DMA1, DMA_CHANNEL1, (uint32_t) waveform);
+    dma_set_peripheral_address(DMA1, DMA_CHANNEL4, (uint32_t) &TIM3_CCR1);
+    dma_set_memory_address(DMA1, DMA_CHANNEL4, (uint32_t) waveform);
 
-    dma_set_number_of_data(DMA1, DMA_CHANNEL1, 192);
+    dma_set_number_of_data(DMA1, DMA_CHANNEL4, DMA_SIZE);
 
-    nvic_enable_irq(NVIC_DMA1_CHANNEL1_IRQ);
-    dma_enable_transfer_complete_interrupt(DMA1, DMA_CHANNEL1);
+    nvic_enable_irq(NVIC_DMA1_CHANNEL4_5_IRQ);
+    dma_enable_transfer_complete_interrupt(DMA1, DMA_CHANNEL4);
 
-    dma_enable_channel(DMA1, DMA_CHANNEL1);
+    // Enable DMA interrupt source
+    timer_enable_irq(TIM3, TIM_DIER_CC1DE);
+    //timer_set_dma_on_compare_event(TIM3);
+
+    dma_enable_channel(DMA1, DMA_CHANNEL4);
 }
 
-void dma1_channel1_isr(void)
+void dma1_channel4_5_isr(void)
 {
-    dma_clear_interrupt_flags(DMA1, DMA_CHANNEL1, DMA_TCIF);
+    dma_clear_interrupt_flags(DMA1, DMA_CHANNEL4, DMA_TCIF);
     /* Toggle PA1 just to keep aware of activity and frequency. */
     gpio_toggle(GPIOA, GPIO1);
 }
 
 int main(void) {
-    int i;
+    uint16_t i;
 
     // Set up DMA waveform
-    for(i = 0; i < 192; i++) {
-        waveform[i] = i;
+    for(i = 0; i < DMA_SIZE; i++) {
+        waveform[i] = 30 + i;
     }
 
     clock_setup_pll_48mhz();
@@ -151,6 +158,8 @@ int main(void) {
     pwm_setup();
     dma_setup();
 
-    while (1);
+    while (1) {
+    }
+
     return 0;
 }
