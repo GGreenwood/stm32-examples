@@ -28,8 +28,7 @@
 
 #define DMA_SIZE    64
 
-uint16_t waveform[DMA_SIZE] __attribute__((aligned(16)));
-uint16_t test __attribute__((aligned(16)));
+uint16_t waveform[DMA_SIZE];
 
 /* Set STM32 to 48 MHz, based on the 12MHz crystal */
 static void clock_setup_pll_48mhz(void) {
@@ -107,6 +106,10 @@ static void pwm_setup(void) {
     // Set TIM3's period to 4us at 48MHz
     timer_set_period(TIM3, 192 - 1);
 
+    // Enable interrupts on overflow
+    timer_enable_irq(TIM3, TIM_DIER_CC1IE);
+    nvic_enable_irq(NVIC_TIM3_IRQ);
+
     // Enable the timer
     timer_enable_counter(TIM3);
 }
@@ -119,29 +122,23 @@ static void dma_setup(void) {
     dma_set_priority(DMA1, DMA_CHANNEL4, DMA_CCR_PL_HIGH);
 
     dma_set_memory_size(DMA1, DMA_CHANNEL4, DMA_CCR_MSIZE_16BIT);
-    dma_set_peripheral_size(DMA1, DMA_CHANNEL4, DMA_CCR_MSIZE_16BIT);
-    //dma_enable_memory_increment_mode(DMA1, DMA_CHANNEL4);
-    //dma_enable_circular_mode(DMA1, DMA_CHANNEL4);
-    dma_enable_mem2mem_mode(DMA1, DMA_CHANNEL4);
+    dma_set_peripheral_size(DMA1, DMA_CHANNEL4, DMA_CCR_PSIZE_16BIT);
+    dma_enable_memory_increment_mode(DMA1, DMA_CHANNEL4);
+    dma_enable_circular_mode(DMA1, DMA_CHANNEL4);
 
     dma_set_read_from_memory(DMA1, DMA_CHANNEL4);
 
-    dma_set_peripheral_address(DMA1, DMA_CHANNEL4, (uint32_t) &TIM3_DMAR);
-    //dma_set_peripheral_address(DMA1, DMA_CHANNEL4, (uint32_t) &TIM3_CCR1);
-    dma_set_memory_address(DMA1, DMA_CHANNEL4, (uint32_t) &test);
+    dma_set_peripheral_address(DMA1, DMA_CHANNEL4, (uint32_t) &TIM3_CCR1);
+    dma_set_memory_address(DMA1, DMA_CHANNEL4, (uint32_t) &waveform[0]);
 
-    dma_set_number_of_data(DMA1, DMA_CHANNEL4, 1);
+    dma_set_number_of_data(DMA1, DMA_CHANNEL4, DMA_SIZE);
 
     nvic_enable_irq(NVIC_DMA1_CHANNEL4_5_IRQ);
-    nvic_enable_irq(NVIC_TIM3_IRQ);
     dma_enable_transfer_complete_interrupt(DMA1, DMA_CHANNEL4);
 
     // Enable DMA interrupt source
     timer_enable_irq(TIM3, TIM_DIER_CC1DE);
-    timer_enable_irq(TIM3, TIM_DIER_CC1IE);
     //timer_set_dma_on_compare_event(TIM3);
-
-    TIM3_DCR = 0x34 >> 2;
 
     dma_enable_channel(DMA1, DMA_CHANNEL4);
 }
@@ -163,22 +160,13 @@ int main(void) {
     uint32_t x;
 
     // Set up DMA waveform
-    /*
     for(i = 0; i < DMA_SIZE; i++) {
-        waveform[i] = (30+i) << 2;
+        waveform[i] = (30+i);
     }
-    */
-
-    //test = 0b010100000;
-    //test = 0x0100;
-    test = 376;
 
     clock_setup_pll_48mhz();
     gpio_setup();
     pwm_setup();
-    for (x = 0; x < 100; x++) {		/* Wait a bit. */
-        __asm__("nop");
-    }
     dma_setup();
 
     while (1) {
